@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscador de Coordenadas por CEP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Gray-100 */
+        }
+        
+        /* Custom scrollbar para a tabela */
+        .table-container::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .table-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .table-container::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .table-container::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col items-center py-10 px-4 sm:px-6 lg:px-8">
+
+    <main class="w-full max-w-4xl bg-white rounded-2xl shadow-xl overflow-hidden transition-all duration-300">
+        
+        <!-- Header com Logo da Andra -->
+        <div class="bg-slate-50 border-b border-slate-100 p-8 text-center flex flex-col items-center">
+            <img src="https://fluig.andra.com.br/volume/stream/Rmx1aWc=/P3Q9MSZ2b2w9RGVmYXVsdCZpZD04NTI3JnZlcj0xMDAwJmZpbGU9QU5EUkErJTI4MSUyOS5wbmcmY3JjPTE2OTA1NzMxMTQmc2l6ZT0wLjAzODc3NCZ1SWQ9MjgmZlNJZD0xJnVTSWQ9MSZkPWZhbHNlJnRrbj0mcHVibGljVXJsPXRydWUmYXR0YWNoPWZhbHNl.png" 
+                 alt="Andra Logo" 
+                 class="h-14 object-contain mb-6 drop-shadow-sm">
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Geocodificador de CEP</h1>
+            <p class="text-sm text-slate-500 mt-2 max-w-md mx-auto">Insira uma lista de CEPs separados por vírgula ou por linha para descobrir a latitude e longitude exatas usando integração ViaCEP + OpenStreetMap.</p>
+        </div>
+
+        <div class="p-8">
+            <div class="mb-6">
+                <label for="cep-input" class="block text-sm font-semibold text-slate-700 mb-2">
+                    Lista de CEPs
+                </label>
+                <textarea id="cep-input" 
+                          rows="5" 
+                          class="w-full p-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-slate-700 placeholder-slate-400 resize-y" 
+                          placeholder="Exemplo:&#10;01001-000, 22041-001&#10;70040-010"></textarea>
+                <p id="error-msg" class="text-red-500 text-sm mt-2 hidden">Por favor, insira pelo menos um CEP válido.</p>
+            </div>
+
+            <!-- Botão de Ação -->
+            <button id="search-btn" class="w-full sm:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2">
+                <span id="btn-text">Buscar Coordenadas</span>
+                <svg id="btn-spinner" class="animate-spin hidden h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Área de Resultados -->
+        <div id="results-container" class="hidden border-t border-slate-100 bg-slate-50">
+            <div class="p-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-slate-800">Resultados</h3>
+                    <span id="progress-text" class="text-sm font-medium text-blue-600 bg-blue-100 px-3 py-1 rounded-full">0/0 concluídos</span>
+                </div>
+                
+                <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm table-container max-h-96 overflow-y-auto">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead class="bg-slate-100 text-slate-600 font-medium sticky top-0 shadow-sm z-10">
+                            <tr>
+                                <th class="py-3 px-4 w-1/4">CEP</th>
+                                <th class="py-3 px-4 w-1/4">Latitude</th>
+                                <th class="py-3 px-4 w-1/4">Longitude</th>
+                                <th class="py-3 px-4 w-1/4 text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-body" class="divide-y divide-slate-100">
+                            <!-- Linhas preenchidas via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const inputElement = document.getElementById('cep-input');
+            const searchBtn = document.getElementById('search-btn');
+            const btnText = document.getElementById('btn-text');
+            const btnSpinner = document.getElementById('btn-spinner');
+            const errorMsg = document.getElementById('error-msg');
+            const resultsContainer = document.getElementById('results-container');
+            const resultsBody = document.getElementById('results-body');
+            const progressText = document.getElementById('progress-text');
+
+            // Função para pausar a execução (1.5s para evitar rate limit)
+            const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+            // Função para formatar as badges de status
+            const getBadgeHTML = (text, type) => {
+                const colors = {
+                    'queue': 'bg-slate-100 text-slate-600',
+                    'searching': 'bg-blue-100 text-blue-800 animate-pulse',
+                    'success': 'bg-green-100 text-green-800',
+                    'invalid': 'bg-orange-100 text-orange-800',
+                    'not_found': 'bg-red-100 text-red-800',
+                    'error': 'bg-red-100 text-red-800'
+                };
+                return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[type]}">${text}</span>`;
+            };
+
+            searchBtn.addEventListener('click', async () => {
+                // Limpa, remove caracteres que não são números, hífens ou separadores, 
+                // e garante que temos apenas os números do CEP para consulta no ViaCEP
+                const rawValue = inputElement.value;
+                const ceps = rawValue
+                    .split(/[\n,]+/)
+                    .map(cep => cep.trim().replace(/\D/g, '')) // Limpa formatação deixando só números
+                    .filter(cep => cep.length === 8); // CEP BR tem 8 dígitos numéricos
+
+                if (ceps.length === 0) {
+                    errorMsg.classList.remove('hidden');
+                    return;
+                }
+                
+                errorMsg.classList.add('hidden');
+                
+                // Configura Estado de Loading
+                searchBtn.disabled = true;
+                searchBtn.classList.add('opacity-75', 'cursor-not-allowed');
+                btnText.textContent = 'Processando...';
+                btnSpinner.classList.remove('hidden');
+                
+                resultsContainer.classList.remove('hidden');
+                resultsBody.innerHTML = '';
+                
+                // Cria as linhas "Na fila"
+                const rowElements = [];
+                ceps.forEach(cep => {
+                    // Formata CEP com máscara para exibição visual
+                    const formattedCep = cep.replace(/^(\d{5})(\d{3})$/, "$1-$2");
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50 transition-colors';
+                    tr.innerHTML = `
+                        <td class="py-3 px-4 font-medium text-slate-700">${formattedCep}</td>
+                        <td class="py-3 px-4 text-slate-400 italic">-</td>
+                        <td class="py-3 px-4 text-slate-400 italic">-</td>
+                        <td class="py-3 px-4 text-center status-cell">${getBadgeHTML('Na fila', 'queue')}</td>
+                    `;
+                    resultsBody.appendChild(tr);
+                    rowElements.push({ tr, cep: formattedCep, rawCep: cep });
+                });
+
+                for (let i = 0; i < rowElements.length; i++) {
+                    const item = rowElements[i];
+                    const row = item.tr;
+                    const statusCell = row.querySelector('.status-cell');
+                    
+                    progressText.textContent = `${i + 1}/${rowElements.length} concluídos`;
+                    statusCell.innerHTML = getBadgeHTML('Consultando...', 'searching');
+
+                    try {
+                        // 1. Busca no ViaCEP primeiro
+                        const viaCepResponse = await fetch(`https://viacep.com.br/ws/${item.rawCep}/json/`);
+                        const viaCepData = await viaCepResponse.json();
+
+                        if (viaCepData.erro) {
+                            // ViaCEP retornou que o CEP não existe
+                            statusCell.innerHTML = getBadgeHTML('CEP Inválido', 'invalid');
+                        } else {
+                            // ViaCEP encontrou! Vamos montar a query para o Nominatim
+                            // Usamos Logradouro (se existir), Cidade, UF, e Brasil
+                            const queryParts = [];
+                            if (viaCepData.logradouro) queryParts.push(viaCepData.logradouro);
+                            if (viaCepData.localidade) queryParts.push(viaCepData.localidade);
+                            if (viaCepData.uf) queryParts.push(viaCepData.uf);
+                            queryParts.push("Brasil");
+
+                            const queryStr = queryParts.join(', ');
+                            const encodedQuery = encodeURIComponent(queryStr);
+
+                            // 2. Busca no Nominatim com o endereço montado
+                            const nomResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodedQuery}&limit=1`);
+                            const nomData = await nomResponse.json();
+
+                            if (nomData && nomData.length > 0) {
+                                // Encontrou Lat/Long
+                                const result = nomData[0];
+                                row.cells[1].textContent = result.lat;
+                                row.cells[1].classList.remove('text-slate-400', 'italic');
+                                row.cells[1].classList.add('text-slate-800');
+
+                                row.cells[2].textContent = result.lon;
+                                row.cells[2].classList.remove('text-slate-400', 'italic');
+                                row.cells[2].classList.add('text-slate-800');
+
+                                statusCell.innerHTML = getBadgeHTML('Encontrado', 'success');
+                            } else {
+                                // Não encontrou coordenadas para esse endereço no mapa
+                                statusCell.innerHTML = getBadgeHTML('Não Encontrado', 'not_found');
+                            }
+                        }
+                    } catch (error) {
+                        // Erro genérico (ex: sem internet ou bloqueio CORS repentino)
+                        console.error('Erro na requisição:', error);
+                        statusCell.innerHTML = getBadgeHTML('Erro', 'error');
+                    }
+
+                    // Atraso de 1.5s entre requisições para evitar rate limit do Nominatim
+                    if (i < rowElements.length - 1) {
+                        await sleep(1500);
+                    }
+                }
+
+                // Reseta estado dos botões ao fim
+                searchBtn.disabled = false;
+                searchBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+                btnText.textContent = 'Buscar Coordenadas';
+                btnSpinner.classList.add('hidden');
+                
+                progressText.classList.replace('text-blue-600', 'text-green-700');
+                progressText.classList.replace('bg-blue-100', 'bg-green-100');
+                progressText.textContent = 'Busca Concluída';
+            });
+        });
+    </script>
+</body>
+</html>
