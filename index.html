@@ -137,7 +137,6 @@
                     markersGroup.clearLayers();
                     map.setView([-14.2350, -51.9253], 4); // Reseta visão inicial
                 }
-                // Ajuste necessário quando um mapa que estava em display:none é exibido
                 setTimeout(() => map.invalidateSize(), 100);
             };
 
@@ -146,8 +145,7 @@
                 const rows = resultsBody.querySelectorAll('tr');
                 rows.forEach(row => {
                     const cols = row.querySelectorAll('td');
-                    if (cols.length === 5) { // Atualizado para 5 colunas
-                        // Adicionamos aspas no endereço para não quebrar o CSV caso haja vírgulas no nome da rua
+                    if (cols.length === 5) { 
                         const end = `"${cols[1].innerText}"`;
                         csv += `${cols[0].innerText},${end},${cols[2].innerText},${cols[3].innerText},${cols[4].innerText}\n`;
                     }
@@ -164,10 +162,8 @@
                 document.body.removeChild(link);
             });
 
-            // Função para pausar a execução
             const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-            // Função para formatar as badges de status
             const getBadgeHTML = (text, type) => {
                 const colors = {
                     'queue': 'bg-slate-100 text-slate-600',
@@ -194,7 +190,6 @@
                 
                 errorMsg.classList.add('hidden');
                 
-                // Configura Estado de Loading
                 searchBtn.disabled = true;
                 searchBtn.classList.add('opacity-75', 'cursor-not-allowed');
                 btnText.textContent = 'Processando...';
@@ -240,36 +235,46 @@
                             statusCell.innerHTML = getBadgeHTML('CEP Inválido', 'invalid');
                             row.cells[1].textContent = "CEP não encontrado";
                         } else {
-                            // 2. Monta Endereço
-                            const queryParts = [];
-                            if (viaCepData.logradouro) queryParts.push(viaCepData.logradouro);
-                            if (viaCepData.bairro) queryParts.push(viaCepData.bairro); // Bairro ajuda muito na precisão
-                            if (viaCepData.localidade) queryParts.push(viaCepData.localidade);
-                            if (viaCepData.uf) queryParts.push(viaCepData.uf);
+                            // --- MONTA ENDEREÇO VISUAL (Com Bairro) ---
+                            const displayParts = [];
+                            if (viaCepData.logradouro) displayParts.push(viaCepData.logradouro);
+                            if (viaCepData.bairro) displayParts.push(viaCepData.bairro); // Mostra o bairro na tela
+                            if (viaCepData.localidade) displayParts.push(viaCepData.localidade);
+                            if (viaCepData.uf) displayParts.push(viaCepData.uf);
                             
-                            const enderecoExibicao = queryParts.join(', ');
-                            queryParts.push("Brasil"); // Adiciona Brasil para a API
-                            const queryStr = queryParts.join(', ');
-                            const encodedQuery = encodeURIComponent(queryStr);
-
-                            // Atualiza a coluna de Endereço na tabela
+                            const enderecoExibicao = displayParts.join(', ');
                             row.cells[1].textContent = enderecoExibicao;
                             row.cells[1].classList.remove('text-slate-400', 'italic');
                             row.cells[1].classList.add('text-slate-700');
 
-                            // 3. Busca no Nominatim com countrycodes=br para restringir o mapeamento
-                            const nomResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodedQuery}&countrycodes=br&limit=1`);
-                            const nomData = await nomResponse.json();
+                            // --- MONTA ENDEREÇO DE BUSCA (Sem Bairro para não dar falha no mapa) ---
+                            const searchParts = [];
+                            if (viaCepData.logradouro) searchParts.push(viaCepData.logradouro);
+                            if (viaCepData.localidade) searchParts.push(viaCepData.localidade);
+                            if (viaCepData.uf) searchParts.push(viaCepData.uf);
+                            
+                            const queryStr = searchParts.join(', ');
+                            const encodedQuery = encodeURIComponent(queryStr);
+
+                            // 2. Tenta buscar a rua e cidade
+                            let nomResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodedQuery}&countrycodes=br&limit=1`);
+                            let nomData = await nomResponse.json();
+
+                            // 3. FALLBACK: Se falhar por nome de rua divergente, tenta buscar puramente pelo CEP
+                            if (!nomData || nomData.length === 0) {
+                                const fallbackQuery = encodeURIComponent(item.rawCep);
+                                const fallbackResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${fallbackQuery}&countrycodes=br&limit=1`);
+                                nomData = await fallbackResponse.json();
+                            }
 
                             if (nomData && nomData.length > 0) {
                                 const result = nomData[0];
                                 
-                                // Atualiza Latitude
+                                // Atualiza Latitude e Longitude
                                 row.cells[2].textContent = result.lat;
                                 row.cells[2].classList.remove('text-slate-400', 'italic');
                                 row.cells[2].classList.add('text-slate-800');
 
-                                // Atualiza Longitude
                                 row.cells[3].textContent = result.lon;
                                 row.cells[3].classList.remove('text-slate-400', 'italic');
                                 row.cells[3].classList.add('text-slate-800');
@@ -281,16 +286,14 @@
                                 const marker = L.marker([lat, lon]).bindPopup(`<b>CEP:</b> ${item.cep}<br><b>Endereço:</b> ${enderecoExibicao}`);
                                 markersGroup.addLayer(marker);
                                 
-                                // Ajusta o zoom automaticamente
                                 map.fitBounds(markersGroup.getBounds(), { padding: [30, 30], maxZoom: 15 });
-
                             } else {
-                                statusCell.innerHTML = getBadgeHTML('Não Encontrado', 'not_found');
+                                statusCell.innerHTML = getBadgeHTML('Não Encontrado no Mapa', 'not_found');
                             }
                         }
                     } catch (error) {
                         console.error('Erro na requisição:', error);
-                        statusCell.innerHTML = getBadgeHTML('Erro', 'error');
+                        statusCell.innerHTML = getBadgeHTML('Erro de Conexão', 'error');
                     }
 
                     // Atraso de 1.2s obrigatório do Nominatim
