@@ -37,7 +37,7 @@
 </head>
 <body class="min-h-screen text-slate-800 flex flex-col items-center py-10 px-4 sm:px-6 lg:px-8">
 
-    <main class="w-full max-w-4xl bg-white rounded-2xl shadow-xl overflow-hidden transition-all duration-300">
+    <main class="w-full max-w-5xl bg-white rounded-2xl shadow-xl overflow-hidden transition-all duration-300">
         
         <!-- Header com Logo da Andra -->
         <div class="bg-slate-50 border-b border-slate-100 p-8 text-center flex flex-col items-center">
@@ -45,7 +45,7 @@
                  alt="Andra Logo" 
                  class="h-14 object-contain mb-6 drop-shadow-sm">
             <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Geocodificador de CEP</h1>
-            <p class="text-sm text-slate-500 mt-2 max-w-md mx-auto">Insira uma lista de CEPs separados por vírgula ou por linha para descobrir a latitude e longitude exatas usando integração ViaCEP + OpenStreetMap.</p>
+            <p class="text-sm text-slate-500 mt-2 max-w-xl mx-auto">Insira uma lista de CEPs separados por vírgula ou por linha para descobrir a latitude e longitude exatas usando integração ViaCEP + OpenStreetMap.</p>
         </div>
 
         <div class="p-8">
@@ -89,10 +89,11 @@
                     <table class="w-full text-left text-sm whitespace-nowrap">
                         <thead class="bg-slate-100 text-slate-600 font-medium sticky top-0 shadow-sm z-10">
                             <tr>
-                                <th class="py-3 px-4 w-1/4">CEP</th>
-                                <th class="py-3 px-4 w-1/4">Latitude</th>
-                                <th class="py-3 px-4 w-1/4">Longitude</th>
-                                <th class="py-3 px-4 w-1/4 text-center">Status</th>
+                                <th class="py-3 px-4 w-1/5">CEP</th>
+                                <th class="py-3 px-4 w-1/5">Endereço Encontrado</th>
+                                <th class="py-3 px-4 w-1/5">Latitude</th>
+                                <th class="py-3 px-4 w-1/5">Longitude</th>
+                                <th class="py-3 px-4 w-1/5 text-center">Status</th>
                             </tr>
                         </thead>
                         <tbody id="results-body" class="divide-y divide-slate-100">
@@ -141,12 +142,14 @@
             };
 
             exportBtn.addEventListener('click', () => {
-                let csv = 'CEP,Latitude,Longitude,Status\n';
+                let csv = 'CEP,Endereco,Latitude,Longitude,Status\n';
                 const rows = resultsBody.querySelectorAll('tr');
                 rows.forEach(row => {
                     const cols = row.querySelectorAll('td');
-                    if (cols.length === 4) {
-                        csv += `${cols[0].innerText},${cols[1].innerText},${cols[2].innerText},${cols[3].innerText}\n`;
+                    if (cols.length === 5) { // Atualizado para 5 colunas
+                        // Adicionamos aspas no endereço para não quebrar o CSV caso haja vírgulas no nome da rua
+                        const end = `"${cols[1].innerText}"`;
+                        csv += `${cols[0].innerText},${end},${cols[2].innerText},${cols[3].innerText},${cols[4].innerText}\n`;
                     }
                 });
 
@@ -178,13 +181,11 @@
             };
 
             searchBtn.addEventListener('click', async () => {
-                // Limpa, remove caracteres que não são números, hífens ou separadores, 
-                // e garante que temos apenas os números do CEP para consulta no ViaCEP
                 const rawValue = inputElement.value;
                 const ceps = rawValue
                     .split(/[\n,]+/)
-                    .map(cep => cep.trim().replace(/\D/g, '')) // Limpa formatação deixando só números
-                    .filter(cep => cep.length === 8); // CEP BR tem 8 dígitos numéricos
+                    .map(cep => cep.trim().replace(/\D/g, ''))
+                    .filter(cep => cep.length === 8);
 
                 if (ceps.length === 0) {
                     errorMsg.classList.remove('hidden');
@@ -200,21 +201,20 @@
                 btnSpinner.classList.remove('hidden');
                 
                 resultsContainer.classList.remove('hidden');
-                exportBtn.classList.add('hidden'); // Oculta botão até terminar a busca
-                mapContainer.classList.remove('hidden'); // Exibe o container do mapa
+                exportBtn.classList.add('hidden'); 
+                mapContainer.classList.remove('hidden'); 
                 resultsBody.innerHTML = '';
                 
-                initMap(); // Inicializa e limpa o mapa
+                initMap(); 
                 
-                // Cria as linhas "Na fila"
                 const rowElements = [];
                 ceps.forEach(cep => {
-                    // Formata CEP com máscara para exibição visual
                     const formattedCep = cep.replace(/^(\d{5})(\d{3})$/, "$1-$2");
                     const tr = document.createElement('tr');
                     tr.className = 'hover:bg-slate-50 transition-colors';
                     tr.innerHTML = `
                         <td class="py-3 px-4 font-medium text-slate-700">${formattedCep}</td>
+                        <td class="py-3 px-4 text-slate-400 italic text-xs whitespace-normal min-w-[200px]">-</td>
                         <td class="py-3 px-4 text-slate-400 italic">-</td>
                         <td class="py-3 px-4 text-slate-400 italic">-</td>
                         <td class="py-3 px-4 text-center status-cell">${getBadgeHTML('Na fila', 'queue')}</td>
@@ -237,63 +237,69 @@
                         const viaCepData = await viaCepResponse.json();
 
                         if (viaCepData.erro) {
-                            // ViaCEP retornou que o CEP não existe
                             statusCell.innerHTML = getBadgeHTML('CEP Inválido', 'invalid');
+                            row.cells[1].textContent = "CEP não encontrado";
                         } else {
-                            // ViaCEP encontrou! Vamos montar a query para o Nominatim
-                            // Usamos Logradouro (se existir), Cidade, UF, e Brasil
+                            // 2. Monta Endereço
                             const queryParts = [];
                             if (viaCepData.logradouro) queryParts.push(viaCepData.logradouro);
+                            if (viaCepData.bairro) queryParts.push(viaCepData.bairro); // Bairro ajuda muito na precisão
                             if (viaCepData.localidade) queryParts.push(viaCepData.localidade);
                             if (viaCepData.uf) queryParts.push(viaCepData.uf);
-                            queryParts.push("Brasil");
-
+                            
+                            const enderecoExibicao = queryParts.join(', ');
+                            queryParts.push("Brasil"); // Adiciona Brasil para a API
                             const queryStr = queryParts.join(', ');
                             const encodedQuery = encodeURIComponent(queryStr);
 
-                            // 2. Busca no Nominatim com o endereço montado
-                            const nomResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodedQuery}&limit=1`);
+                            // Atualiza a coluna de Endereço na tabela
+                            row.cells[1].textContent = enderecoExibicao;
+                            row.cells[1].classList.remove('text-slate-400', 'italic');
+                            row.cells[1].classList.add('text-slate-700');
+
+                            // 3. Busca no Nominatim com countrycodes=br para restringir o mapeamento
+                            const nomResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodedQuery}&countrycodes=br&limit=1`);
                             const nomData = await nomResponse.json();
 
                             if (nomData && nomData.length > 0) {
-                                // Encontrou Lat/Long
                                 const result = nomData[0];
-                                row.cells[1].textContent = result.lat;
-                                row.cells[1].classList.remove('text-slate-400', 'italic');
-                                row.cells[1].classList.add('text-slate-800');
-
-                                row.cells[2].textContent = result.lon;
+                                
+                                // Atualiza Latitude
+                                row.cells[2].textContent = result.lat;
                                 row.cells[2].classList.remove('text-slate-400', 'italic');
                                 row.cells[2].classList.add('text-slate-800');
+
+                                // Atualiza Longitude
+                                row.cells[3].textContent = result.lon;
+                                row.cells[3].classList.remove('text-slate-400', 'italic');
+                                row.cells[3].classList.add('text-slate-800');
 
                                 statusCell.innerHTML = getBadgeHTML('Encontrado', 'success');
 
                                 const lat = parseFloat(result.lat);
                                 const lon = parseFloat(result.lon);
-                                const marker = L.marker([lat, lon]).bindPopup(`<b>CEP:</b> ${item.cep}<br><b>Endereço:</b> ${queryStr}`);
+                                const marker = L.marker([lat, lon]).bindPopup(`<b>CEP:</b> ${item.cep}<br><b>Endereço:</b> ${enderecoExibicao}`);
                                 markersGroup.addLayer(marker);
                                 
-                                // Ajusta o zoom automaticamente para enquadrar todos os pins
+                                // Ajusta o zoom automaticamente
                                 map.fitBounds(markersGroup.getBounds(), { padding: [30, 30], maxZoom: 15 });
 
                             } else {
-                                // Não encontrou coordenadas para esse endereço no mapa
                                 statusCell.innerHTML = getBadgeHTML('Não Encontrado', 'not_found');
                             }
                         }
                     } catch (error) {
-                        // Erro genérico (ex: sem internet ou bloqueio CORS repentino)
                         console.error('Erro na requisição:', error);
                         statusCell.innerHTML = getBadgeHTML('Erro', 'error');
                     }
 
-                    // Atraso de 1.2s entre requisições para evitar rate limit do Nominatim
+                    // Atraso de 1.2s obrigatório do Nominatim
                     if (i < rowElements.length - 1) {
                         await sleep(1200);
                     }
                 }
 
-                // Reseta estado dos botões ao fim
+                // Finalização
                 searchBtn.disabled = false;
                 searchBtn.classList.remove('opacity-75', 'cursor-not-allowed');
                 btnText.textContent = 'Buscar Coordenadas';
@@ -303,7 +309,7 @@
                 progressText.classList.replace('bg-blue-100', 'bg-green-100');
                 progressText.textContent = 'Busca Concluída';
                 
-                exportBtn.classList.remove('hidden'); // Libera o botão CSV
+                exportBtn.classList.remove('hidden'); 
             });
         });
     </script>
