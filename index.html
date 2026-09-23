@@ -1,311 +1,219 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Buscador de Coordenadas por CEP</title>
+    <title>Geocodificador de CEP - Andra</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6; /* Gray-100 */
-        }
-        
-        /* Custom scrollbar para a tabela */
-        .table-container::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        .table-container::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 4px;
-        }
-        .table-container::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 4px;
-        }
-        .table-container::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
+        #map { height: 350px; width: 100%; border-radius: 0.5rem; z-index: 1; }
     </style>
 </head>
-<body class="min-h-screen text-slate-800 flex flex-col items-center py-10 px-4 sm:px-6 lg:px-8">
-
-    <main class="w-full max-w-4xl bg-white rounded-2xl shadow-xl overflow-hidden transition-all duration-300">
-        
-        <!-- Header com Logo da Andra -->
-        <div class="bg-slate-50 border-b border-slate-100 p-8 text-center flex flex-col items-center">
-            <img src="https://fluig.andra.com.br/volume/stream/Rmx1aWc=/P3Q9MSZ2b2w9RGVmYXVsdCZpZD04NTI3JnZlcj0xMDAwJmZpbGU9QU5EUkErJTI4MSUyOS5wbmcmY3JjPTE2OTA1NzMxMTQmc2l6ZT0wLjAzODc3NCZ1SWQ9MjgmZlNJZD0xJnVTSWQ9MSZkPWZhbHNlJnRrbj0mcHVibGljVXJsPXRydWUmYXR0YWNoPWZhbHNl.png" 
-                 alt="Andra Logo" 
-                 class="h-14 object-contain mb-6 drop-shadow-sm">
-            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Geocodificador de CEP</h1>
-            <p class="text-sm text-slate-500 mt-2 max-w-md mx-auto">Insira uma lista de CEPs separados por vírgula ou por linha para descobrir a latitude e longitude exatas usando integração ViaCEP + OpenStreetMap.</p>
+<body class="bg-gray-100 min-h-screen p-8 font-sans">
+    <div class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="p-8 text-center border-b border-gray-100">
+            <img src="https://fluig.andra.com.br/volume/stream/Rmx1aWc=/P3Q9MSZ2b2w9RGVmYXVsdCZpZD04NTI3JnZlcj0xMDAwJmZpbGU9QU5EUkErJTI4MSUyOS5wbmcmY3JjPTE2OTA1NzMxMTQmc2l6ZT0wLjAzODc3NCZ1SWQ9MjgmZlNJZD0xJnVTSWQ9MSZkPWZhbHNlJnRrbj0mcHVibGljVXJsPXRydWUmYXR0YWNoPWZhbHNl.png" alt="Logo Andra" class="h-16 mx-auto mb-4">
+            <h1 class="text-3xl font-bold text-gray-800">Geocodificador de CEP</h1>
+            <p class="text-gray-500 mt-2">Insira uma lista de CEPs separados por vírgula ou por linha.</p>
         </div>
 
-        <div class="p-8">
-            <div class="mb-6">
-                <label for="cep-input" class="block text-sm font-semibold text-slate-700 mb-2">
-                    Lista de CEPs
-                </label>
-                <textarea id="cep-input" 
-                          rows="5" 
-                          class="w-full p-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-slate-700 placeholder-slate-400 resize-y" 
-                          placeholder="Exemplo:&#10;01001-000, 22041-001&#10;70040-010"></textarea>
-                <p id="error-msg" class="text-red-500 text-sm mt-2 hidden">Por favor, insira pelo menos um CEP válido.</p>
-            </div>
-
-            <!-- Botão de Ação -->
-            <button id="search-btn" class="w-full sm:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2">
-                <span id="btn-text">Buscar Coordenadas</span>
-                <svg id="btn-spinner" class="animate-spin hidden h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-            </button>
-        </div>
-
-        <!-- Área de Resultados -->
-        <div id="results-container" class="hidden border-t border-slate-100 bg-slate-50">
-            <div class="p-8">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-semibold text-slate-800">Resultados</h3>
-                    <div class="flex items-center gap-3">
-                        <span id="progress-text" class="text-sm font-medium text-blue-600 bg-blue-100 px-3 py-1 rounded-full">0/0 concluídos</span>
-                        <!-- Botão Exportar CSV -->
-                        <button id="export-btn" class="hidden px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-lg shadow transition-colors flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                            Exportar CSV
-                        </button>
-                    </div>
-                </div>
+        <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Lista de CEPs</label>
+                <textarea id="cepInput" rows="6" class="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Ex: 02925-160, 01001-000"></textarea>
                 
-                <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm table-container max-h-96 overflow-y-auto mb-6">
-                    <table class="w-full text-left text-sm whitespace-nowrap">
-                        <thead class="bg-slate-100 text-slate-600 font-medium sticky top-0 shadow-sm z-10">
-                            <tr>
-                                <th class="py-3 px-4 w-1/4">CEP</th>
-                                <th class="py-3 px-4 w-1/4">Latitude</th>
-                                <th class="py-3 px-4 w-1/4">Longitude</th>
-                                <th class="py-3 px-4 w-1/4 text-center">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="results-body" class="divide-y divide-slate-100">
-                            <!-- Linhas preenchidas via JS -->
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Mapa Interativo -->
-                <div id="map-container" class="hidden border border-slate-200 rounded-xl overflow-hidden shadow-sm h-96 w-full relative z-0">
-                    <div id="map" class="w-full h-full z-0"></div>
+                <div class="mt-4 flex gap-4">
+                    <button id="btnBuscar" onclick="iniciarBusca()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200">
+                        Buscar Coordenadas
+                    </button>
+                    <button id="btnExportar" onclick="exportarCSV()" class="hidden bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200">
+                        Exportar CSV
+                    </button>
                 </div>
             </div>
+            <div id="map-container" class="hidden">
+                <div id="map" class="shadow-inner border border-gray-200"></div>
+            </div>
         </div>
-    </main>
+
+        <div class="p-8 bg-gray-50 border-t border-gray-100">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Resultados</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse" id="resultadosTable">
+                    <thead>
+                        <tr class="text-sm text-gray-600 border-b border-gray-300">
+                            <th class="pb-3 pr-4 font-semibold">CEP</th>
+                            <th class="pb-3 pr-4 font-semibold">Endereço Encontrado</th>
+                            <th class="pb-3 pr-4 font-semibold">Latitude</th>
+                            <th class="pb-3 pr-4 font-semibold">Longitude</th>
+                            <th class="pb-3 font-semibold text-right">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaCorpo" class="text-sm">
+                        <tr>
+                            <td colspan="5" class="py-8 text-center text-gray-400">Nenhuma busca realizada.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const inputElement = document.getElementById('cep-input');
-            const searchBtn = document.getElementById('search-btn');
-            const btnText = document.getElementById('btn-text');
-            const btnSpinner = document.getElementById('btn-spinner');
-            const errorMsg = document.getElementById('error-msg');
-            const resultsContainer = document.getElementById('results-container');
-            const resultsBody = document.getElementById('results-body');
-            const progressText = document.getElementById('progress-text');
-            const exportBtn = document.getElementById('export-btn');
-            const mapContainer = document.getElementById('map-container');
+        let map;
+        let markers = [];
+        let mapBounds;
 
-            let map = null;
-            let markersGroup = null;
+        function initMap() {
+            if (!map) {
+                document.getElementById('map-container').classList.remove('hidden');
+                map = L.map('map').setView([-14.2350, -51.9253], 4); 
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+            }
+            // Limpa marcadores anteriores
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+            mapBounds = L.latLngBounds();
+        }
 
-            const initMap = () => {
-                if (!map) {
-                    map = L.map('map').setView([-14.2350, -51.9253], 4); // Centro do Brasil
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    }).addTo(map);
-                    markersGroup = L.featureGroup().addTo(map);
-                } else {
-                    markersGroup.clearLayers();
-                    map.setView([-14.2350, -51.9253], 4); // Reseta visão inicial
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        async function iniciarBusca() {
+            const input = document.getElementById('cepInput').value;
+            const ceps = input.replace(/[\n\r]/g, ',').split(',').map(c => c.trim().replace(/\D/g, '')).filter(c => c.length === 8);
+            
+            const tbody = document.getElementById('tabelaCorpo');
+            const btnBuscar = document.getElementById('btnBuscar');
+            const btnExportar = document.getElementById('btnExportar');
+
+            if (ceps.length === 0) {
+                alert("Insira pelo menos um CEP válido.");
+                return;
+            }
+
+            btnBuscar.disabled = true;
+            btnBuscar.classList.add('opacity-50', 'cursor-not-allowed');
+            btnBuscar.innerText = "Processando...";
+            btnExportar.classList.add('hidden');
+            tbody.innerHTML = '';
+            initMap();
+
+            for (let cep of ceps) {
+                const tr = document.createElement('tr');
+                tr.id = `row-${cep}`;
+                tr.className = "border-b border-gray-200 hover:bg-gray-100 transition";
+                tr.innerHTML = `
+                    <td class="py-3 pr-4 font-medium">${cep}</td>
+                    <td class="py-3 pr-4 text-gray-500" id="end-${cep}">-</td>
+                    <td class="py-3 pr-4 text-gray-500" id="lat-${cep}">-</td>
+                    <td class="py-3 pr-4 text-gray-500" id="lon-${cep}">-</td>
+                    <td class="py-3 text-right">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800" id="status-${cep}">
+                            Aguardando...
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+
+            for (let i = 0; i < ceps.length; i++) {
+                const cep = ceps[i];
+                await processarCEP(cep);
+                if (i < ceps.length - 1) {
+                    await sleep(1200); 
                 }
-                // Ajuste necessário quando um mapa que estava em display:none é exibido
-                setTimeout(() => map.invalidateSize(), 100);
-            };
+            }
 
-            exportBtn.addEventListener('click', () => {
-                let csv = 'CEP,Latitude,Longitude,Status\n';
-                const rows = resultsBody.querySelectorAll('tr');
-                rows.forEach(row => {
-                    const cols = row.querySelectorAll('td');
-                    if (cols.length === 4) {
-                        csv += `${cols[0].innerText},${cols[1].innerText},${cols[2].innerText},${cols[3].innerText}\n`;
-                    }
-                });
+            btnBuscar.disabled = false;
+            btnBuscar.classList.remove('opacity-50', 'cursor-not-allowed');
+            btnBuscar.innerText = "Buscar Coordenadas";
+            btnExportar.classList.remove('hidden');
+        }
 
-                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement("a");
-                link.setAttribute("href", url);
-                link.setAttribute("download", "coordenadas_ceps.csv");
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            });
+        async function processarCEP(cep) {
+            const statusBadge = document.getElementById(`status-${cep}`);
+            const latCell = document.getElementById(`lat-${cep}`);
+            const lonCell = document.getElementById(`lon-${cep}`);
+            const endCell = document.getElementById(`end-${cep}`);
 
-            // Função para pausar a execução
-            const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+            try {
+                statusBadge.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800";
+                statusBadge.innerText = "Buscando ViaCEP...";
 
-            // Função para formatar as badges de status
-            const getBadgeHTML = (text, type) => {
-                const colors = {
-                    'queue': 'bg-slate-100 text-slate-600',
-                    'searching': 'bg-blue-100 text-blue-800 animate-pulse',
-                    'success': 'bg-green-100 text-green-800',
-                    'invalid': 'bg-orange-100 text-orange-800',
-                    'not_found': 'bg-red-100 text-red-800',
-                    'error': 'bg-red-100 text-red-800'
-                };
-                return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[type]}">${text}</span>`;
-            };
+                const viaCepRes = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+                const viaCepData = await viaCepRes.json();
 
-            searchBtn.addEventListener('click', async () => {
-                // Limpa, remove caracteres que não são números, hífens ou separadores, 
-                // e garante que temos apenas os números do CEP para consulta no ViaCEP
-                const rawValue = inputElement.value;
-                const ceps = rawValue
-                    .split(/[\n,]+/)
-                    .map(cep => cep.trim().replace(/\D/g, '')) // Limpa formatação deixando só números
-                    .filter(cep => cep.length === 8); // CEP BR tem 8 dígitos numéricos
+                if (viaCepData.erro) throw new Error("CEP não existe");
 
-                if (ceps.length === 0) {
-                    errorMsg.classList.remove('hidden');
-                    return;
-                }
+                const enderecoCompleto = `${viaCepData.logradouro}, ${viaCepData.bairro}, ${viaCepData.localidade}, ${viaCepData.uf}`;
+                endCell.innerText = enderecoCompleto;
+
+                statusBadge.innerText = "Buscando Mapa...";
+
+                // SOLUÇÃO: Query estruturada e hiper-específica + countrycodes=br para evitar ambiguidades
+                const queryNominatim = `${enderecoCompleto}, Brasil`;
+                const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryNominatim)}&countrycodes=br&limit=1`;
                 
-                errorMsg.classList.add('hidden');
-                
-                // Configura Estado de Loading
-                searchBtn.disabled = true;
-                searchBtn.classList.add('opacity-75', 'cursor-not-allowed');
-                btnText.textContent = 'Processando...';
-                btnSpinner.classList.remove('hidden');
-                
-                resultsContainer.classList.remove('hidden');
-                exportBtn.classList.add('hidden'); // Oculta botão até terminar a busca
-                mapContainer.classList.remove('hidden'); // Exibe o container do mapa
-                resultsBody.innerHTML = '';
-                
-                initMap(); // Inicializa e limpa o mapa
-                
-                // Cria as linhas "Na fila"
-                const rowElements = [];
-                ceps.forEach(cep => {
-                    // Formata CEP com máscara para exibição visual
-                    const formattedCep = cep.replace(/^(\d{5})(\d{3})$/, "$1-$2");
-                    const tr = document.createElement('tr');
-                    tr.className = 'hover:bg-slate-50 transition-colors';
-                    tr.innerHTML = `
-                        <td class="py-3 px-4 font-medium text-slate-700">${formattedCep}</td>
-                        <td class="py-3 px-4 text-slate-400 italic">-</td>
-                        <td class="py-3 px-4 text-slate-400 italic">-</td>
-                        <td class="py-3 px-4 text-center status-cell">${getBadgeHTML('Na fila', 'queue')}</td>
-                    `;
-                    resultsBody.appendChild(tr);
-                    rowElements.push({ tr, cep: formattedCep, rawCep: cep });
-                });
+                const nomRes = await fetch(nominatimUrl);
+                const nomData = await nomRes.json();
 
-                for (let i = 0; i < rowElements.length; i++) {
-                    const item = rowElements[i];
-                    const row = item.tr;
-                    const statusCell = row.querySelector('.status-cell');
+                if (nomData.length > 0) {
+                    const lat = parseFloat(nomData[0].lat).toFixed(6);
+                    const lon = parseFloat(nomData[0].lon).toFixed(6);
                     
-                    progressText.textContent = `${i + 1}/${rowElements.length} concluídos`;
-                    statusCell.innerHTML = getBadgeHTML('Consultando...', 'searching');
+                    latCell.innerText = lat;
+                    lonCell.innerText = lon;
+                    latCell.classList.replace('text-gray-500', 'text-gray-900');
+                    lonCell.classList.replace('text-gray-500', 'text-gray-900');
 
-                    try {
-                        // 1. Busca no ViaCEP primeiro
-                        const viaCepResponse = await fetch(`https://viacep.com.br/ws/${item.rawCep}/json/`);
-                        const viaCepData = await viaCepResponse.json();
+                    statusBadge.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800";
+                    statusBadge.innerText = "Sucesso";
 
-                        if (viaCepData.erro) {
-                            // ViaCEP retornou que o CEP não existe
-                            statusCell.innerHTML = getBadgeHTML('CEP Inválido', 'invalid');
-                        } else {
-                            // ViaCEP encontrou! Vamos montar a query para o Nominatim
-                            // Usamos Logradouro (se existir), Cidade, UF, e Brasil
-                            const queryParts = [];
-                            if (viaCepData.logradouro) queryParts.push(viaCepData.logradouro);
-                            if (viaCepData.localidade) queryParts.push(viaCepData.localidade);
-                            if (viaCepData.uf) queryParts.push(viaCepData.uf);
-                            queryParts.push("Brasil");
-
-                            const queryStr = queryParts.join(', ');
-                            const encodedQuery = encodeURIComponent(queryStr);
-
-                            // 2. Busca no Nominatim com o endereço montado
-                            const nomResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodedQuery}&limit=1`);
-                            const nomData = await nomResponse.json();
-
-                            if (nomData && nomData.length > 0) {
-                                // Encontrou Lat/Long
-                                const result = nomData[0];
-                                row.cells[1].textContent = result.lat;
-                                row.cells[1].classList.remove('text-slate-400', 'italic');
-                                row.cells[1].classList.add('text-slate-800');
-
-                                row.cells[2].textContent = result.lon;
-                                row.cells[2].classList.remove('text-slate-400', 'italic');
-                                row.cells[2].classList.add('text-slate-800');
-
-                                statusCell.innerHTML = getBadgeHTML('Encontrado', 'success');
-
-                                const lat = parseFloat(result.lat);
-                                const lon = parseFloat(result.lon);
-                                const marker = L.marker([lat, lon]).bindPopup(`<b>CEP:</b> ${item.cep}<br><b>Endereço:</b> ${queryStr}`);
-                                markersGroup.addLayer(marker);
-                                
-                                // Ajusta o zoom automaticamente para enquadrar todos os pins
-                                map.fitBounds(markersGroup.getBounds(), { padding: [30, 30], maxZoom: 15 });
-
-                            } else {
-                                // Não encontrou coordenadas para esse endereço no mapa
-                                statusCell.innerHTML = getBadgeHTML('Não Encontrado', 'not_found');
-                            }
-                        }
-                    } catch (error) {
-                        // Erro genérico (ex: sem internet ou bloqueio CORS repentino)
-                        console.error('Erro na requisição:', error);
-                        statusCell.innerHTML = getBadgeHTML('Erro', 'error');
-                    }
-
-                    // Atraso de 1.2s entre requisições para evitar rate limit do Nominatim
-                    if (i < rowElements.length - 1) {
-                        await sleep(1200);
-                    }
+                    const marker = L.marker([lat, lon]).addTo(map).bindPopup(`<b>${cep}</b><br>${enderecoCompleto}`);
+                    markers.push(marker);
+                    mapBounds.extend([lat, lon]);
+                    map.fitBounds(mapBounds, { padding: [30, 30], maxZoom: 15 });
+                    
+                } else {
+                    throw new Error("Coordenada não encontrada");
                 }
 
-                // Reseta estado dos botões ao fim
-                searchBtn.disabled = false;
-                searchBtn.classList.remove('opacity-75', 'cursor-not-allowed');
-                btnText.textContent = 'Buscar Coordenadas';
-                btnSpinner.classList.add('hidden');
-                
-                progressText.classList.replace('text-blue-600', 'text-green-700');
-                progressText.classList.replace('bg-blue-100', 'bg-green-100');
-                progressText.textContent = 'Busca Concluída';
-                
-                exportBtn.classList.remove('hidden'); // Libera o botão CSV
+            } catch (error) {
+                statusBadge.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800";
+                statusBadge.innerText = error.message === "CEP não existe" ? "CEP Inválido" : "Erro no Mapa";
+            }
+        }
+
+        function exportarCSV() {
+            let csv = "CEP,Endereco,Latitude,Longitude,Status\n";
+            const linhas = document.querySelectorAll("#tabelaCorpo tr");
+            
+            linhas.forEach(linha => {
+                const cols = linha.querySelectorAll("td");
+                if(cols.length === 5) {
+                    const cep = cols[0].innerText;
+                    const end = `"${cols[1].innerText}"`; 
+                    const lat = cols[2].innerText;
+                    const lon = cols[3].innerText;
+                    const status = cols[4].innerText.trim();
+                    csv += `${cep},${end},${lat},${lon},${status}\n`;
+                }
             });
-        });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "coordenadas_ceps.csv");
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     </script>
 </body>
 </html>
