@@ -14,10 +14,9 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6; /* Gray-100 */
+            background-color: #f3f4f6;
         }
         
-        /* Custom scrollbar para a tabela */
         .table-container::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -39,13 +38,12 @@
 
     <main class="w-full max-w-5xl bg-white rounded-2xl shadow-xl overflow-hidden transition-all duration-300">
         
-        <!-- Header com Logo da Andra -->
         <div class="bg-slate-50 border-b border-slate-100 p-8 text-center flex flex-col items-center">
             <img src="https://fluig.andra.com.br/volume/stream/Rmx1aWc=/P3Q9MSZ2b2w9RGVmYXVsdCZpZD04NTI3JnZlcj0xMDAwJmZpbGU9QU5EUkErJTI4MSUyOS5wbmcmY3JjPTE2OTA1NzMxMTQmc2l6ZT0wLjAzODc3NCZ1SWQ9MjgmZlNJZD0xJnVTSWQ9MSZkPWZhbHNlJnRrbj0mcHVibGljVXJsPXRydWUmYXR0YWNoPWZhbHNl.png" 
                  alt="Andra Logo" 
                  class="h-14 object-contain mb-6 drop-shadow-sm">
             <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Geocodificador de CEP</h1>
-            <p class="text-sm text-slate-500 mt-2 max-w-xl mx-auto">Insira uma lista de CEPs separados por vírgula ou por linha para descobrir a latitude e longitude exatas usando integração ViaCEP + OpenStreetMap.</p>
+            <p class="text-sm text-slate-500 mt-2 max-w-xl mx-auto">Insira uma lista de CEPs separados por vírgula ou por linha para descobrir a latitude e longitude exatas. Integração direta com bases IBGE via AwesomeAPI / BrasilAPI.</p>
         </div>
 
         <div class="p-8">
@@ -56,11 +54,10 @@
                 <textarea id="cep-input" 
                           rows="5" 
                           class="w-full p-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-slate-700 placeholder-slate-400 resize-y" 
-                          placeholder="Exemplo:&#10;01001-000, 22041-001&#10;70040-010"></textarea>
+                          placeholder="Exemplo:&#10;08180-380&#10;02925-160"></textarea>
                 <p id="error-msg" class="text-red-500 text-sm mt-2 hidden">Por favor, insira pelo menos um CEP válido.</p>
             </div>
 
-            <!-- Botão de Ação -->
             <button id="search-btn" class="w-full sm:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2">
                 <span id="btn-text">Buscar Coordenadas</span>
                 <svg id="btn-spinner" class="animate-spin hidden h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -70,14 +67,12 @@
             </button>
         </div>
 
-        <!-- Área de Resultados -->
         <div id="results-container" class="hidden border-t border-slate-100 bg-slate-50">
             <div class="p-8">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-semibold text-slate-800">Resultados</h3>
                     <div class="flex items-center gap-3">
                         <span id="progress-text" class="text-sm font-medium text-blue-600 bg-blue-100 px-3 py-1 rounded-full">0/0 concluídos</span>
-                        <!-- Botão Exportar CSV -->
                         <button id="export-btn" class="hidden px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-lg shadow transition-colors flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                             Exportar CSV
@@ -97,12 +92,10 @@
                             </tr>
                         </thead>
                         <tbody id="results-body" class="divide-y divide-slate-100">
-                            <!-- Linhas preenchidas via JS -->
                         </tbody>
                     </table>
                 </div>
 
-                <!-- Mapa Interativo -->
                 <div id="map-container" class="hidden border border-slate-200 rounded-xl overflow-hidden shadow-sm h-96 w-full relative z-0">
                     <div id="map" class="w-full h-full z-0"></div>
                 </div>
@@ -128,14 +121,14 @@
 
             const initMap = () => {
                 if (!map) {
-                    map = L.map('map').setView([-14.2350, -51.9253], 4); // Centro do Brasil
+                    map = L.map('map').setView([-14.2350, -51.9253], 4); 
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     }).addTo(map);
                     markersGroup = L.featureGroup().addTo(map);
                 } else {
                     markersGroup.clearLayers();
-                    map.setView([-14.2350, -51.9253], 4); // Reseta visão inicial
+                    map.setView([-14.2350, -51.9253], 4);
                 }
                 setTimeout(() => map.invalidateSize(), 100);
             };
@@ -162,19 +155,18 @@
                 document.body.removeChild(link);
             });
 
-            const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
             const getBadgeHTML = (text, type) => {
                 const colors = {
                     'queue': 'bg-slate-100 text-slate-600',
                     'searching': 'bg-blue-100 text-blue-800 animate-pulse',
                     'success': 'bg-green-100 text-green-800',
                     'invalid': 'bg-orange-100 text-orange-800',
-                    'not_found': 'bg-red-100 text-red-800',
                     'error': 'bg-red-100 text-red-800'
                 };
                 return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[type]}">${text}</span>`;
             };
+
+            const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
             searchBtn.addEventListener('click', async () => {
                 const rawValue = inputElement.value;
@@ -189,7 +181,6 @@
                 }
                 
                 errorMsg.classList.add('hidden');
-                
                 searchBtn.disabled = true;
                 searchBtn.classList.add('opacity-75', 'cursor-not-allowed');
                 btnText.textContent = 'Processando...';
@@ -226,83 +217,76 @@
                     progressText.textContent = `${i + 1}/${rowElements.length} concluídos`;
                     statusCell.innerHTML = getBadgeHTML('Consultando...', 'searching');
 
-                    try {
-                        // 1. Busca no ViaCEP primeiro
-                        const viaCepResponse = await fetch(`https://viacep.com.br/ws/${item.rawCep}/json/`);
-                        const viaCepData = await viaCepResponse.json();
+                    let foundData = null;
 
-                        if (viaCepData.erro) {
-                            statusCell.innerHTML = getBadgeHTML('CEP Inválido', 'invalid');
-                            row.cells[1].textContent = "CEP não encontrado";
-                        } else {
-                            // --- MONTA ENDEREÇO VISUAL (Com Bairro) ---
-                            const displayParts = [];
-                            if (viaCepData.logradouro) displayParts.push(viaCepData.logradouro);
-                            if (viaCepData.bairro) displayParts.push(viaCepData.bairro); // Mostra o bairro na tela
-                            if (viaCepData.localidade) displayParts.push(viaCepData.localidade);
-                            if (viaCepData.uf) displayParts.push(viaCepData.uf);
-                            
-                            const enderecoExibicao = displayParts.join(', ');
-                            row.cells[1].textContent = enderecoExibicao;
+                    try {
+                        // TENTATIVA 1: AwesomeAPI (Direto da base IBGE/Correios com Latitude e Longitude Exata)
+                        const responseAwesome = await fetch(`https://cep.awesomeapi.com.br/json/${item.rawCep}`);
+                        
+                        if (responseAwesome.ok) {
+                            const data = await responseAwesome.json();
+                            if (data.lat && data.lng) {
+                                foundData = {
+                                    endereco: `${data.address}, ${data.district || ''}, ${data.city} - ${data.state}`,
+                                    lat: parseFloat(data.lat),
+                                    lon: parseFloat(data.lng)
+                                };
+                            }
+                        }
+
+                        // TENTATIVA 2 (Fallback): BrasilAPI V2 (Caso a AwesomeAPI falhe ou não tenha as coordenadas daquele CEP específico)
+                        if (!foundData) {
+                            const responseBrasil = await fetch(`https://brasilapi.com.br/api/cep/v2/${item.rawCep}`);
+                            if (responseBrasil.ok) {
+                                const brData = await responseBrasil.json();
+                                if (brData.location && brData.location.coordinates && brData.location.coordinates.latitude) {
+                                    foundData = {
+                                        endereco: `${brData.street}, ${brData.neighborhood}, ${brData.city} - ${brData.state}`,
+                                        lat: parseFloat(brData.location.coordinates.latitude),
+                                        lon: parseFloat(brData.location.coordinates.longitude)
+                                    };
+                                }
+                            }
+                        }
+
+                        // PREENCHE OS RESULTADOS
+                        if (foundData) {
+                            // Limpa qualquer formatação suja e exibe o endereço
+                            const cleanEndereco = foundData.endereco.replace(/, ,/g, ',');
+                            row.cells[1].textContent = cleanEndereco;
                             row.cells[1].classList.remove('text-slate-400', 'italic');
                             row.cells[1].classList.add('text-slate-700');
 
-                            // --- MONTA ENDEREÇO DE BUSCA (Sem Bairro para não dar falha no mapa) ---
-                            const searchParts = [];
-                            if (viaCepData.logradouro) searchParts.push(viaCepData.logradouro);
-                            if (viaCepData.localidade) searchParts.push(viaCepData.localidade);
-                            if (viaCepData.uf) searchParts.push(viaCepData.uf);
-                            
-                            const queryStr = searchParts.join(', ');
-                            const encodedQuery = encodeURIComponent(queryStr);
+                            row.cells[2].textContent = foundData.lat.toFixed(6);
+                            row.cells[2].classList.remove('text-slate-400', 'italic');
+                            row.cells[2].classList.add('text-slate-800');
 
-                            // 2. Tenta buscar a rua e cidade
-                            let nomResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodedQuery}&countrycodes=br&limit=1`);
-                            let nomData = await nomResponse.json();
+                            row.cells[3].textContent = foundData.lon.toFixed(6);
+                            row.cells[3].classList.remove('text-slate-400', 'italic');
+                            row.cells[3].classList.add('text-slate-800');
 
-                            // 3. FALLBACK: Se falhar por nome de rua divergente, tenta buscar puramente pelo CEP
-                            if (!nomData || nomData.length === 0) {
-                                const fallbackQuery = encodeURIComponent(item.rawCep);
-                                const fallbackResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${fallbackQuery}&countrycodes=br&limit=1`);
-                                nomData = await fallbackResponse.json();
-                            }
+                            statusCell.innerHTML = getBadgeHTML('Encontrado', 'success');
 
-                            if (nomData && nomData.length > 0) {
-                                const result = nomData[0];
-                                
-                                // Atualiza Latitude e Longitude
-                                row.cells[2].textContent = result.lat;
-                                row.cells[2].classList.remove('text-slate-400', 'italic');
-                                row.cells[2].classList.add('text-slate-800');
-
-                                row.cells[3].textContent = result.lon;
-                                row.cells[3].classList.remove('text-slate-400', 'italic');
-                                row.cells[3].classList.add('text-slate-800');
-
-                                statusCell.innerHTML = getBadgeHTML('Encontrado', 'success');
-
-                                const lat = parseFloat(result.lat);
-                                const lon = parseFloat(result.lon);
-                                const marker = L.marker([lat, lon]).bindPopup(`<b>CEP:</b> ${item.cep}<br><b>Endereço:</b> ${enderecoExibicao}`);
-                                markersGroup.addLayer(marker);
-                                
-                                map.fitBounds(markersGroup.getBounds(), { padding: [30, 30], maxZoom: 15 });
-                            } else {
-                                statusCell.innerHTML = getBadgeHTML('Não Encontrado no Mapa', 'not_found');
-                            }
+                            // Plota no mapa
+                            const marker = L.marker([foundData.lat, foundData.lon]).bindPopup(`<b>CEP:</b> ${item.cep}<br><b>Endereço:</b> ${cleanEndereco}`);
+                            markersGroup.addLayer(marker);
+                            map.fitBounds(markersGroup.getBounds(), { padding: [30, 30], maxZoom: 15 });
+                        } else {
+                            row.cells[1].textContent = "CEP sem coordenadas nas bases";
+                            statusCell.innerHTML = getBadgeHTML('Inválido / Sem Coordenada', 'invalid');
                         }
+
                     } catch (error) {
                         console.error('Erro na requisição:', error);
                         statusCell.innerHTML = getBadgeHTML('Erro de Conexão', 'error');
                     }
 
-                    // Atraso de 1.2s obrigatório do Nominatim
+                    // Atraso sutil para não sobrecarregar as APIs gratuitas
                     if (i < rowElements.length - 1) {
-                        await sleep(1200);
+                        await sleep(800);
                     }
                 }
 
-                // Finalização
                 searchBtn.disabled = false;
                 searchBtn.classList.remove('opacity-75', 'cursor-not-allowed');
                 btnText.textContent = 'Buscar Coordenadas';
