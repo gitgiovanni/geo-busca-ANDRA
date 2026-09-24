@@ -43,14 +43,26 @@
                  alt="Andra Logo" 
                  class="h-14 object-contain mb-6 drop-shadow-sm">
             <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Geocodificador de CEP</h1>
-            <p class="text-sm text-slate-500 mt-2 max-w-xl mx-auto">Insira uma lista de CEPs separados por vírgula ou por linha para descobrir a latitude e longitude exatas. Integração direta com bases IBGE via AwesomeAPI / BrasilAPI.</p>
+            <p class="text-sm text-slate-500 mt-2 max-w-xl mx-auto">Insira uma lista de CEPs ou importe uma planilha para descobrir a latitude e longitude exatas. Integração direta com bases IBGE via AwesomeAPI / BrasilAPI.</p>
         </div>
 
         <div class="p-8">
             <div class="mb-6">
-                <label for="cep-input" class="block text-sm font-semibold text-slate-700 mb-2">
-                    Lista de CEPs
-                </label>
+                <div class="flex justify-between items-end mb-2">
+                    <label for="cep-input" class="block text-sm font-semibold text-slate-700">
+                        Lista de CEPs
+                    </label>
+                    <!-- Botão de Importar Planilha -->
+                    <div>
+                        <input type="file" id="csv-file" accept=".csv, .txt" class="hidden">
+                        <label for="csv-file" class="cursor-pointer flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 hover:bg-blue-100">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                            Importar Planilha (CSV)
+                        </label>
+                    </div>
+                </div>
                 <textarea id="cep-input" 
                           rows="5" 
                           class="w-full p-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-slate-700 placeholder-slate-400 resize-y" 
@@ -115,10 +127,43 @@
             const progressText = document.getElementById('progress-text');
             const exportBtn = document.getElementById('export-btn');
             const mapContainer = document.getElementById('map-container');
+            const csvFileInput = document.getElementById('csv-file');
 
             let map = null;
             let markersGroup = null;
 
+            // ---- LÓGICA DE IMPORTAÇÃO DE CSV ----
+            csvFileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const text = event.target.result;
+                    // Regex inteligente que captura sequências de 8 números (com ou sem traço)
+                    const regex = /\b\d{5}-?\d{3}\b/g;
+                    const matches = text.match(regex);
+
+                    if (matches && matches.length > 0) {
+                        // Limpa os traços, remove os duplicados e formata lindamente
+                        const uniqueCeps = [...new Set(matches.map(c => c.replace(/\D/g, '')))];
+                        const formattedCeps = uniqueCeps.map(c => c.replace(/^(\d{5})(\d{3})$/, "$1-$2"));
+                        
+                        // Adiciona os CEPs novos na caixa (mantendo o que já tiver lá)
+                        const currentVal = inputElement.value.trim();
+                        inputElement.value = currentVal ? currentVal + '\n' + formattedCeps.join('\n') : formattedCeps.join('\n');
+                        
+                    } else {
+                        alert('Não foi possível identificar nenhum CEP válido nesta planilha. Certifique-se de que existem CEPs de 8 dígitos no arquivo.');
+                    }
+                    
+                    // Limpa o input file para permitir importar o mesmo arquivo novamente se necessário
+                    csvFileInput.value = '';
+                };
+                reader.readAsText(file);
+            });
+
+            // ---- LÓGICA DO MAPA E BUSCA ----
             const initMap = () => {
                 if (!map) {
                     map = L.map('map').setView([-14.2350, -51.9253], 4); 
@@ -220,7 +265,6 @@
                     let foundData = null;
 
                     try {
-                        // TENTATIVA 1: AwesomeAPI (Direto da base IBGE/Correios com Latitude e Longitude Exata)
                         const responseAwesome = await fetch(`https://cep.awesomeapi.com.br/json/${item.rawCep}`);
                         
                         if (responseAwesome.ok) {
@@ -234,7 +278,6 @@
                             }
                         }
 
-                        // TENTATIVA 2 (Fallback): BrasilAPI V2 (Caso a AwesomeAPI falhe ou não tenha as coordenadas daquele CEP específico)
                         if (!foundData) {
                             const responseBrasil = await fetch(`https://brasilapi.com.br/api/cep/v2/${item.rawCep}`);
                             if (responseBrasil.ok) {
@@ -249,9 +292,7 @@
                             }
                         }
 
-                        // PREENCHE OS RESULTADOS
                         if (foundData) {
-                            // Limpa qualquer formatação suja e exibe o endereço
                             const cleanEndereco = foundData.endereco.replace(/, ,/g, ',');
                             row.cells[1].textContent = cleanEndereco;
                             row.cells[1].classList.remove('text-slate-400', 'italic');
@@ -267,7 +308,6 @@
 
                             statusCell.innerHTML = getBadgeHTML('Encontrado', 'success');
 
-                            // Plota no mapa
                             const marker = L.marker([foundData.lat, foundData.lon]).bindPopup(`<b>CEP:</b> ${item.cep}<br><b>Endereço:</b> ${cleanEndereco}`);
                             markersGroup.addLayer(marker);
                             map.fitBounds(markersGroup.getBounds(), { padding: [30, 30], maxZoom: 15 });
@@ -281,7 +321,6 @@
                         statusCell.innerHTML = getBadgeHTML('Erro de Conexão', 'error');
                     }
 
-                    // Atraso sutil para não sobrecarregar as APIs gratuitas
                     if (i < rowElements.length - 1) {
                         await sleep(800);
                     }
